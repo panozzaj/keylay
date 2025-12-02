@@ -67,3 +67,85 @@ class TestApkGeneration:
     def test_complex_missing_layout_returns_400(self, client):
         response = client.post("/complex", data={})
         assert response.status_code == 400
+
+    def test_simple_form_caps_lock_to_escape(self, client):
+        """Test the common CAPS_LOCK -> ESCAPE mapping works correctly."""
+        response = client.post(
+            "/simple",
+            data={
+                "layout": "",
+                "layout2": "-",
+                "from1": "58",  # CAPS_LOCK keycode
+                "to1": "ESCAPE",
+            },
+        )
+        assert response.status_code == 200
+        assert response.content_type == "application/vnd.android.package-archive"
+
+        with zipfile.ZipFile(io.BytesIO(response.data)) as zf:
+            kcm = zf.read("res/Q2.kcm").decode("utf-8")
+            assert "map key 58 ESCAPE" in kcm
+
+    def test_simple_form_multiple_mappings(self, client):
+        """Test multiple key mappings are all included."""
+        response = client.post(
+            "/simple",
+            data={
+                "layout": "",
+                "layout2": "-",
+                "from1": "58",  # CAPS_LOCK
+                "to1": "ESCAPE",
+                "from2": "1",  # ESC key
+                "to2": "CAPS_LOCK",
+            },
+        )
+        assert response.status_code == 200
+
+        with zipfile.ZipFile(io.BytesIO(response.data)) as zf:
+            kcm = zf.read("res/Q2.kcm").decode("utf-8")
+            assert "map key 58 ESCAPE" in kcm
+            assert "map key 1 CAPS_LOCK" in kcm
+
+    def test_simple_form_with_second_layout(self, client):
+        """Test that selecting a second layout produces a two-layout APK."""
+        response = client.post(
+            "/simple",
+            data={
+                "layout": "",
+                "layout2": "keyboard_layout_german.kcm",  # An actual layout
+                "from1": "58",
+                "to1": "ESCAPE",
+            },
+        )
+        assert response.status_code == 200
+
+        with zipfile.ZipFile(io.BytesIO(response.data)) as zf:
+            # Two-layout APK should have both Q2.kcm and _f.kcm
+            assert "res/Q2.kcm" in zf.namelist()
+            assert "res/_f.kcm" in zf.namelist()
+
+            kcm1 = zf.read("res/Q2.kcm").decode("utf-8")
+            kcm2 = zf.read("res/_f.kcm").decode("utf-8")
+            assert "map key 58 ESCAPE" in kcm1
+            assert "map key 58 ESCAPE" in kcm2
+
+    def test_simple_form_empty_mapping_ignored(self, client):
+        """Test that empty from/to values are ignored."""
+        response = client.post(
+            "/simple",
+            data={
+                "layout": "",
+                "layout2": "-",
+                "from1": "58",
+                "to1": "ESCAPE",
+                "from2": "",  # Empty - should be ignored
+                "to2": "CTRL_LEFT",
+            },
+        )
+        assert response.status_code == 200
+
+        with zipfile.ZipFile(io.BytesIO(response.data)) as zf:
+            kcm = zf.read("res/Q2.kcm").decode("utf-8")
+            assert "map key 58 ESCAPE" in kcm
+            # CTRL_LEFT should NOT appear since from2 was empty
+            assert "CTRL_LEFT" not in kcm

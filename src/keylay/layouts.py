@@ -22,7 +22,11 @@ def read_layout(name: str) -> Optional[str]:
     path = get_kcm_path(name)
     if not path.exists():
         return None
-    return path.read_text(encoding="utf-8")
+    # Try UTF-8 first, fall back to Latin-1 for older KCM files
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return path.read_text(encoding="latin-1")
 
 
 def parse_map_key(line: str) -> Optional[tuple[bool, str, str]]:
