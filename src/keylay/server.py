@@ -92,7 +92,7 @@ def create_app(builder: ApkBuilder | None = None) -> Flask:
             io.BytesIO(apk_bytes),
             mimetype="application/vnd.android.package-archive",
             as_attachment=True,
-            download_name="Keyboard Layout.apk",
+            download_name="KeyboardLayout.apk",
         )
 
     return app

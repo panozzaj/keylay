@@ -110,14 +110,18 @@ class ApkSigner:
         return "\r\n".join(lines).encode("utf-8")
 
     def _create_pkcs7_signature(self, data: bytes) -> bytes:
-        """Create PKCS#7 detached signature."""
+        """Create PKCS#7 detached signature for APK v1 signing."""
         from cryptography.hazmat.primitives.serialization import pkcs7
 
+        # NoCapabilities removes SMIMECapabilities which Android doesn't support
         signature = (
             pkcs7.PKCS7SignatureBuilder()
             .set_data(data)
             .add_signer(self.cert, self.private_key, hashes.SHA256())
-            .sign(serialization.Encoding.DER, [pkcs7.PKCS7Options.DetachedSignature])
+            .sign(
+                serialization.Encoding.DER,
+                [pkcs7.PKCS7Options.DetachedSignature, pkcs7.PKCS7Options.NoCapabilities],
+            )
         )
         return signature
 
