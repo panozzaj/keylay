@@ -79,3 +79,42 @@ class TestApkSigner:
             rsa = zf.read("META-INF/KEYLAY.RSA")
             # PKCS7 signatures start with specific ASN.1 header
             assert len(rsa) > 100
+
+    def test_pkcs7_signature_android_compatible(self, builder):
+        """Test that PKCS7 signature has correct structure for Android.
+
+        Android's APK v1 signing requires:
+        - SHA-256 digest algorithm
+        - contentType attribute (OID 1.2.840.113549.1.9.3)
+        - messageDigest attribute (OID 1.2.840.113549.1.9.4)
+        - No SMIMECapabilities (OID 1.2.840.113549.1.9.15) - Android rejects this
+        """
+        from cryptography.hazmat.primitives.serialization import pkcs7
+
+        layout = "type OVERLAY\n"
+        apk_bytes = builder.build_apk(layout)
+
+        with zipfile.ZipFile(io.BytesIO(apk_bytes)) as zf:
+            rsa_bytes = zf.read("META-INF/KEYLAY.RSA")
+
+            # Load and parse the PKCS7 structure
+            certs = pkcs7.load_der_pkcs7_certificates(rsa_bytes)
+            assert len(certs) == 1, "Should contain exactly one signing certificate"
+
+            # Verify expected OIDs are present (DER-encoded)
+            # SHA-256: 2.16.840.1.101.3.4.2.1
+            sha256_oid = bytes([0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01])
+            assert sha256_oid in rsa_bytes, "Should use SHA-256 digest"
+
+            # contentType: 1.2.840.113549.1.9.3
+            content_type_oid = bytes([0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x09, 0x03])
+            assert content_type_oid in rsa_bytes, "Should have contentType attribute"
+
+            # messageDigest: 1.2.840.113549.1.9.4
+            message_digest_oid = bytes([0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x09, 0x04])
+            assert message_digest_oid in rsa_bytes, "Should have messageDigest attribute"
+
+            # SMIMECapabilities must NOT be present: 1.2.840.113549.1.9.15
+            smime_capabilities_oid = bytes([0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x09, 0x0F])
+            assert smime_capabilities_oid not in rsa_bytes, \
+                "SMIMECapabilities breaks Android APK verification"
