@@ -8,3 +8,11 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Signing credentials (generate your own, don't commit)
+*.p12
+*.pem
+*.key
+
+# Temp files
+tmp/
