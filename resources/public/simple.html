@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Android external keyboard remapping without root</title>
     <link rel="stylesheet" href="./common.css">
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css" rel="stylesheet">
     <style>
         form {
             width: 100%;
@@ -38,6 +39,46 @@
 
         td:last-child {
             text-align: right;
+        }
+
+        .ts-wrapper {
+            margin-top: 8px;
+        }
+
+        .ts-control {
+            border-radius: 6px;
+            padding: 0.5rem;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .ts-control,
+            .ts-dropdown,
+            .ts-dropdown-content {
+                background: #2a2a2a !important;
+                color: #e0e0e0;
+                border-color: #444;
+            }
+            .ts-control input {
+                color: #e0e0e0 !important;
+                background: transparent !important;
+            }
+            .ts-wrapper.focus .ts-control {
+                background: #2a2a2a !important;
+                border-color: #666;
+                box-shadow: none;
+            }
+            .ts-dropdown .active,
+            .ts-dropdown .option:hover {
+                background: #444 !important;
+                color: #fff;
+            }
+            .ts-dropdown .optgroup-header {
+                color: #999;
+                background: #2a2a2a;
+            }
+            .ts-dropdown .option {
+                color: #e0e0e0;
+            }
         }
     </style>
 </head>
@@ -980,6 +1021,7 @@
         <option value="keyboard_layout_ukrainian.kcm">Ukrainian</option>
     </template>
 
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
     <script>
         let mappingId = 0
 
@@ -998,6 +1040,8 @@
 
         layout.appendChild(layoutsTemplate.content.cloneNode(true))
         layout2.appendChild(layoutsTemplate.content.cloneNode(true))
+        new TomSelect(layout, {create: false})
+        new TomSelect(layout2, {create: false})
 
         function addMapping() {
             mappingId++
@@ -1017,11 +1061,12 @@
                 removeTableRow(e.target)
             })
 
-            tbody.appendChild(createTableRow([
-                from,
-                to,
-                removeButton
-            ]))
+            const row = createTableRow([from, to, removeButton])
+            tbody.appendChild(row)
+
+            // Initialize tom-select after adding to DOM
+            new TomSelect(from, {create: false})
+            new TomSelect(to, {create: false})
 
             function createSelect() {
                 const option = document.createElement("option")
