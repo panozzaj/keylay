@@ -1,6 +1,7 @@
 """Flask web server for building keyboard layout APKs."""
 
 import logging
+import os
 from pathlib import Path
 
 from flask import Flask, redirect, request, send_file, send_from_directory
@@ -13,13 +14,51 @@ logger = logging.getLogger(__name__)
 RESOURCES_DIR = Path(__file__).parent.parent.parent / "resources"
 PUBLIC_DIR = RESOURCES_DIR / "public"
 
+# Maximum layout content size (64KB should be plenty for any KCM file)
+MAX_LAYOUT_SIZE = 64 * 1024
+
 
 def create_app(builder: ApkBuilder | None = None) -> Flask:
     """Create and configure the Flask application."""
     app = Flask(__name__)
 
+    # Secret key for CSRF protection (generate random if not set)
+    app.config["SECRET_KEY"] = os.environ.get(
+        "FLASK_SECRET_KEY", os.urandom(32).hex()
+    )
+
     if builder is None:
         builder = create_builder_from_env()
+
+    @app.after_request
+    def add_security_headers(response):
+        """Add security headers to all responses."""
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+    @app.before_request
+    def check_origin():
+        """Basic CSRF protection: reject POST requests from other origins."""
+        if request.method == "POST":
+            origin = request.headers.get("Origin")
+            referer = request.headers.get("Referer")
+            host = request.host_url.rstrip("/")
+
+            # Allow if no origin (same-origin requests from some browsers)
+            if origin is None and referer is None:
+                return None
+
+            # Check origin matches our host
+            if origin and not origin.startswith(host):
+                return "Cross-origin requests not allowed", 403
+
+            # Fall back to referer check
+            if referer and not referer.startswith(host):
+                return "Cross-origin requests not allowed", 403
+
+        return None
 
     @app.route("/")
     def index():
@@ -75,7 +114,14 @@ def create_app(builder: ApkBuilder | None = None) -> Flask:
         if not layout:
             return "Missing layout", 400
 
+        # Validate layout size
+        if len(layout) > MAX_LAYOUT_SIZE:
+            return "Layout content too large", 400
+
         layout2 = request.form.get("layout2")
+        if layout2 and len(layout2) > MAX_LAYOUT_SIZE:
+            return "Second layout content too large", 400
+
         return serve_apk(layout, layout2)
 
     def serve_apk(layout: str, layout2: str | None):

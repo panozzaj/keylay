@@ -216,12 +216,13 @@ class ApkBuilder:
 
 def create_builder_from_env() -> ApkBuilder:
     """Create an ApkBuilder using environment config or defaults."""
-    key_password = os.environ.get("KEYLAY_KEY_PASSWORD", "exkeymo").encode()
-
     # Try PKCS12 first, then PEM files
     p12_path = RESOURCES_DIR / "keylay.p12"
     if p12_path.exists():
-        signer = ApkSigner.from_pkcs12(p12_path, key_password)
+        key_password = os.environ.get("KEYLAY_KEY_PASSWORD")
+        if not key_password:
+            raise ValueError("KEYLAY_KEY_PASSWORD environment variable required for PKCS12")
+        signer = ApkSigner.from_pkcs12(p12_path, key_password.encode())
     else:
         cert_path = RESOURCES_DIR / "keylay_cert.pem"
         key_path = RESOURCES_DIR / "keylay_key.pem"

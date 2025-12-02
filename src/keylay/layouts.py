@@ -11,7 +11,13 @@ RESOURCES_DIR = Path(__file__).parent.parent.parent / "resources"
 
 
 def get_kcm_path(name: str) -> Path:
-    """Get the path to a KCM file by name."""
+    """Get the path to a KCM file by name.
+
+    Raises:
+        ValueError: If name contains path traversal characters.
+    """
+    if "/" in name or "\\" in name or ".." in name:
+        raise ValueError("Invalid layout name")
     return RESOURCES_DIR / "kcm" / name
 
 

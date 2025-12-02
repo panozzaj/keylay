@@ -7,6 +7,7 @@ from keylay.layouts import (
     MODIFICATIONS_COMMENT,
     from_layout,
     from_named_layout,
+    get_kcm_path,
     parse_map_key,
 )
 
@@ -74,3 +75,24 @@ class TestFromNamedLayout:
         result = from_named_layout(None, {"58": "CTRL_LEFT"})
         assert "type OVERLAY" in result
         assert "map key 58 CTRL_LEFT" in result
+
+
+class TestPathTraversal:
+    """Test that path traversal attacks are blocked."""
+
+    def test_rejects_parent_directory(self):
+        with pytest.raises(ValueError, match="Invalid layout name"):
+            get_kcm_path("../keylay_key.pem")
+
+    def test_rejects_absolute_path(self):
+        with pytest.raises(ValueError, match="Invalid layout name"):
+            get_kcm_path("/etc/passwd")
+
+    def test_rejects_backslash(self):
+        with pytest.raises(ValueError, match="Invalid layout name"):
+            get_kcm_path("..\\keylay_key.pem")
+
+    def test_accepts_valid_filename(self):
+        # Should not raise
+        path = get_kcm_path("keyboard_layout_german.kcm")
+        assert path.name == "keyboard_layout_german.kcm"
